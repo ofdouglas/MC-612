@@ -18,9 +18,9 @@
 #define V_PID_KD		(F16(1.0 / CONTROL_RATE))
 
 // Position controller loop gains
-#define P_PID_KP		(F16(10.0))
-#define P_PID_KI		(F16(0.0 / CONTROL_RATE))
-#define P_PID_KD		(F16(1.0 / CONTROL_RATE))
+#define P_PID_KP		(F16(5.0))
+#define P_PID_KI		(F16(0.1 / CONTROL_RATE))
+#define P_PID_KD		(F16(5.0 / CONTROL_RATE))
 
 
 fix16_t goal_speed = F16(0);
@@ -76,9 +76,9 @@ fix16_t encoder_get_velocity(void)
   return recursive_lpf(diff);
 }
 
-fix16_t encoder_get_position(void)
+int encoder_get_position(void)
 {
-  return fix16_to_int(timer_get_counter(TIM3));
+  return timer_get_counter(TIM3);
 }
 
 
@@ -116,22 +116,33 @@ fix16_t velocity_controller(fix16_t goal_speed)
 }
 
 
-fix16_t position_controller(fix16_t goal_position)
+fix16_t position_controller(int goal_position)
 {
-  static fix16_t integral;
-  fix16_t position, error, result;
+  static fix16_t error_prev;
+  int position, cw_error, ccw_error;
+  fix16_t error, derivative, proportional, result;
 
+  // Choose the shorter of the clockwise and counterclockwise difference
+  // between present and desired position 
   position = encoder_get_position();
-  error = fix16_ssub(goal_position, position);
-  integral = fix16_add(integral, fix16_smul(error, P_PID_KI));
-  result = fix16_add(fix16_smul(error, P_PID_KP), integral);
+  cw_error = modular_subtract(position, goal_position, ENCODER_COUNTS);
+  ccw_error = modular_subtract(goal_position, position, ENCODER_COUNTS);
+  if (cw_error < ccw_error)
+    error = fix16_from_int(-cw_error);
+  else
+    error = fix16_from_int(ccw_error);
+
+  xprintf("%d %d %d\n", cw_error, ccw_error, error >> 16);
+  //  integral = fix16_add(integral, fix16_smul(error, P_PID_KI));
   
-  xprintf("%d %d %d\n", position, error, result);
+  derivative = fix16_smul(fix16_ssub(error, error_prev), P_PID_KD);
+  proportional = fix16_smul(error, P_PID_KP);
+  result = fix16_add(derivative, proportional);
+  error_prev = error;
   
+  //xprintf("%d %d\n", error >> 16, result >> 16);
   return result;
 }
-
-
 
 QueueHandle_t cmd_queue;
 
@@ -173,10 +184,11 @@ void motor_control_task(void * foo)
       break;
       
     case CMD_POSITION:	// constant position
-      controller_output = position_controller(mc.arg);
+      controller_output = position_controller(fix16_to_int(mc.arg));
       set_pwm(controller_output);
       break;
     }
+
     
     
     //    xprintf("%d, %d\n", position, duty);

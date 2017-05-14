@@ -36,17 +36,17 @@
 
 #define DEBUG		0
 
-struct print_msg {
-  const char * fmt_str;
-  fix16_t arg;
-};
-
-
 enum { CMD_NEUTRAL, CMD_BRAKE, CMD_VELOCITY, CMD_POSITION };
        
 struct motion_cmd {
   int cmd;
   fix16_t arg;
+};
+
+struct ctrl_log {
+  fix16_t position;
+  fix16_t velocity;
+  fix16_t controller_output;
 };
 
 /*  USART

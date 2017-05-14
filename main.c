@@ -5,9 +5,10 @@
 extern void usart_config(void);
 extern void usart_putchar(unsigned char c);
 extern void motor_control_task(void * foo);
-extern void serial_write_task(void * foo);
-extern void serial_read_task(void * foo);
+extern void cmd_line_task(void * foo);
+extern void logging_task(void * foo);
 
+QueueHandle_t log_queue;
 
 void assertion_failed(void)
 {
@@ -60,23 +61,14 @@ void encoder_timer_config(void)
   timer_enable_counter(TIM3);
 }
 
-extern QueueHandle_t lpq;
-
-// Toggle green LED
+// Toggle green LED to show that the system is still running
 void toggle_task(void *foo)
 {
   (void)foo;
-
-  struct print_msg pmsg = {
-    .fmt_str = "message: %d\n",
-  };
   
   while (1) {
     vTaskDelay((const TickType_t) 250);
     gpio_toggle(GPIOC, LED_GREEN_BIT);
-
-    //    pmsg.arg++;
-    //    xQueueSend(lpq, &pmsg, portMAX_DELAY);
   }
 }
 
@@ -126,19 +118,19 @@ int main(void)
   pwm_timer_config();
   encoder_timer_config();
 
-    xdev_out(usart_putchar);
-    
+  log_queue = xQueueCreate(10, sizeof(struct ctrl_log));
+  
   xTaskCreate(toggle_task, "", configMINIMAL_STACK_SIZE,
 	      NULL, 1, NULL);
   
   xTaskCreate(motor_control_task, "", configMINIMAL_STACK_SIZE,
-    	      NULL, 3, NULL);
+    	      log_queue, 3, NULL);
 
-  xTaskCreate(serial_write_task, "", configMINIMAL_STACK_SIZE,
+  xTaskCreate(cmd_line_task, "", configMINIMAL_STACK_SIZE,
 	      NULL, 2, NULL);
   
-  xTaskCreate(serial_read_task, "", configMINIMAL_STACK_SIZE,
-	      NULL, 2, NULL);
+  xTaskCreate(logging_task, "", configMINIMAL_STACK_SIZE,
+	      log_queue, 2, NULL);
   
   vTaskStartScheduler();
   

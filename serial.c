@@ -243,10 +243,14 @@ int cmd_index_lookup(const char *str)
 }
 
 
-void serial_read_task(void * foo)
+void cmd_line_task(void * foo)
 {
   (void) foo;
 
+  xdev_out(usart_putchar);
+  xputs("MC-612 Motor Controller Online\n");
+  xputs("==============================\n");
+  
   char cmd_buf[MAX_CMD_LEN + 1];
   char arg_buf[MAX_ARG_LEN + 1];
 
@@ -278,19 +282,10 @@ void serial_read_task(void * foo)
 
 
 
-void serial_write_task(void * foo)
+void logging_task(void * foo)
 {
   (void) foo;
-  
 
-  xputs("MC-612 Motor Controller Online\n");
-  xputs("==============================\n");
-
-  lpq = xQueueCreate(16, sizeof(struct print_msg));
-
-  struct print_msg pmsg;
   while (1) {
-    xQueueReceive(lpq, &pmsg, portMAX_DELAY);
-    xprintf(pmsg.fmt_str, pmsg.arg);
   }
 }
