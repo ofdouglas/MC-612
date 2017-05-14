@@ -1,12 +1,19 @@
-
+/*******************************************************************************
+ * main.c - Motor controller setup
+ * Author: Oliver Douglas
+ *
+ ******************************************************************************/
 
 #include "common.h"
 
-extern void usart_config(void);
-extern void usart_putchar(unsigned char c);
+
 extern void motor_control_task(void * foo);
 extern void cmd_line_task(void * foo);
 extern void logging_task(void * foo);
+
+extern void pwm_timer_config(void);
+extern void encoder_timer_config(void);
+extern void usart_config(void);
 
 QueueHandle_t log_queue;
 
@@ -18,48 +25,6 @@ void assertion_failed(void)
     ; // do nothing
 }
 
-
-void pwm_timer_config(void)
-{
-  // Configure timer to count up in edge-aligned mode; no input clock divider
-  rcc_periph_clock_enable(RCC_TIM2);
-  timer_reset(TIM2);
-  timer_set_mode(TIM2, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
-
-  // 20 kHz / 50 us PWM cycles
-  timer_set_prescaler(TIM2, 0);
-  timer_set_period(TIM2, 399);
-
-  // Enable PWM outputs. 'Break' output must be enabled, although though the
-  // datasheet doesn't bother to mention this fact...
-    
-  timer_set_oc_mode(TIM2, TIM_OC2, TIM_OCM_PWM1);
-  timer_set_oc_value(TIM2, TIM_OC2, 0);
-  timer_enable_oc_output(TIM2, TIM_OC2);
-  
-  timer_set_oc_mode(TIM2, TIM_OC3, TIM_OCM_PWM1);
-  timer_set_oc_value(TIM2, TIM_OC3, 0);
-  timer_enable_oc_output(TIM2, TIM_OC3);
- 
-  //  Uncomment if using tim1_cc_isr() for debugging:
-  //  timer_enable_irq(TIM2, TIM_DIER_CC1IE);
-  //  nvic_enable_irq(NVIC_TIM2_CC_IRQ);
-  
-  timer_enable_counter(TIM2);
-}
-
-
-// The output gear ratio is 50:1, so our encoder counts per rev of the
-// output shaft is 64 * 50 = 3200
-void encoder_timer_config(void)
-{
-  rcc_periph_clock_enable(RCC_TIM3);
-  timer_set_period(TIM3, 3199);
-  timer_slave_set_mode(TIM3, 0x3);
-  timer_ic_set_input(TIM3, TIM_IC1, TIM_IC_IN_TI1);
-  timer_ic_set_input(TIM3, TIM_IC1, TIM_IC_IN_TI2);
-  timer_enable_counter(TIM3);
-}
 
 // Toggle green LED to show that the system is still running
 void toggle_task(void *foo)
@@ -73,7 +38,7 @@ void toggle_task(void *foo)
 }
 
 
-void clock_config(void)
+void clock_setup(void)
 {
   // Enable GPIOA, GPIOC
   rcc_periph_clock_enable(RCC_GPIOA);
@@ -84,7 +49,7 @@ void clock_config(void)
 }
 
 
-void io_pin_config(void)
+void io_pin_setup(void)
 {
   // Configure PA.9, PA.10 as USART1 Tx and Rx
   gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9 | GPIO10);
@@ -112,11 +77,11 @@ int main(void)
   // Allow the debugger to work during sleep modes
   DBGMCU_CR = DBGMCU_CR_STOP | DBGMCU_CR_STANDBY;
   
-  clock_config();
-  io_pin_config();
-  usart_config();
-  pwm_timer_config();
-  encoder_timer_config();
+  clock_setup();
+  io_pin_setup();
+  usart_setup();
+  pwm_setup();
+  encoder_setup();
 
   log_queue = xQueueCreate(10, sizeof(struct ctrl_log));
   
