@@ -60,15 +60,23 @@ void encoder_timer_config(void)
   timer_enable_counter(TIM3);
 }
 
+extern QueueHandle_t lpq;
 
 // Toggle green LED
 void toggle_task(void *foo)
 {
   (void)foo;
+
+  struct print_msg pmsg = {
+    .fmt_str = "message: %d\n",
+  };
   
   while (1) {
-    gpio_toggle(GPIOC, LED_GREEN_BIT);
     vTaskDelay((const TickType_t) 250);
+    gpio_toggle(GPIOC, LED_GREEN_BIT);
+
+    //    pmsg.arg++;
+    //    xQueueSend(lpq, &pmsg, portMAX_DELAY);
   }
 }
 
@@ -118,11 +126,13 @@ int main(void)
   pwm_timer_config();
   encoder_timer_config();
 
+    xdev_out(usart_putchar);
+    
   xTaskCreate(toggle_task, "", configMINIMAL_STACK_SIZE,
 	      NULL, 1, NULL);
   
   xTaskCreate(motor_control_task, "", configMINIMAL_STACK_SIZE,
-  	      NULL, 3, NULL);
+    	      NULL, 3, NULL);
 
   xTaskCreate(serial_write_task, "", configMINIMAL_STACK_SIZE,
 	      NULL, 2, NULL);

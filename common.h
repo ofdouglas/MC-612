@@ -36,6 +36,19 @@
 
 #define DEBUG		0
 
+struct print_msg {
+  const char * fmt_str;
+  fix16_t arg;
+};
+
+
+enum { CMD_NEUTRAL, CMD_BRAKE, CMD_VELOCITY, CMD_POSITION };
+       
+struct motion_cmd {
+  int cmd;
+  fix16_t arg;
+};
+
 /*  USART
  *   USART1_TX [PA9]
  *   USART1_RX [PA10]

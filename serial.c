@@ -6,6 +6,7 @@
 
 extern fix16_t goal_speed;
 
+
 #define RX_BUF_LEN 64
 #define TX_BUF_LEN 64
 
@@ -29,6 +30,8 @@ static struct circbuf tx_buf = {
 // Incremented when a line is received, decremented when the line is processed
 static SemaphoreHandle_t rx_sem;
 
+// Pass 'deferred printf' messages to the serial_write_task
+QueueHandle_t lpq;
 
 // 
 void usart1_isr(void)
@@ -68,7 +71,7 @@ void usart_putchar(unsigned char c)
 void usart_config(void)
 {
   // Configure the USART in asynchronous 8n1 mode
-  usart_set_baudrate(USART1, 115200);
+  usart_set_baudrate(USART1, 460800);
   usart_set_databits(USART1, 8);
   usart_set_parity(USART1, USART_PARITY_NONE);
   usart_set_stopbits(USART1, 1);
@@ -131,17 +134,40 @@ int strncmp(const char * a, const char * b, size_t n)
   return diff;
 }
 
-
+extern QueueHandle_t cmd_queue;
 
 int cmd_set_rpm(fix16_t arg)
 {
-  goal_speed = arg;
+  struct motion_cmd mc = {
+    .cmd = CMD_VELOCITY,
+    .arg = arg
+  };
+  
+  xQueueSend(cmd_queue, &mc, portMAX_DELAY);
   
   return 0;
 }
 
+int cmd_set_pos(fix16_t arg)
+{
+  struct motion_cmd mc = {
+    .cmd = CMD_POSITION,
+    .arg = arg
+  };
+  
+  xQueueSend(cmd_queue, &mc, portMAX_DELAY);
+  
+  return 0;
+}
 int cmd_stop(fix16_t arg)
 {
+  struct motion_cmd mc = {
+    .cmd = CMD_BRAKE,
+    .arg = 0
+  };
+  
+  xQueueSend(cmd_queue, &mc, portMAX_DELAY);
+  
   
   return 0;
 }
@@ -153,6 +179,7 @@ struct command {
 
 struct command cmd_table[] = {
   { .name = "rpm", cmd_set_rpm },
+  { .name = "pos", cmd_set_pos },
   { .name = "stp", cmd_stop }
 };
 
@@ -250,14 +277,20 @@ void serial_read_task(void * foo)
 }
 
 
+
 void serial_write_task(void * foo)
 {
   (void) foo;
   
-  xdev_out(usart_putchar);
-  xputs("hello\n");
 
+  xputs("MC-612 Motor Controller Online\n");
+  xputs("==============================\n");
+
+  lpq = xQueueCreate(16, sizeof(struct print_msg));
+
+  struct print_msg pmsg;
   while (1) {
-    ; // do nothing
+    xQueueReceive(lpq, &pmsg, portMAX_DELAY);
+    xprintf(pmsg.fmt_str, pmsg.arg);
   }
 }
