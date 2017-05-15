@@ -94,7 +94,7 @@ struct ctrl_log {
 
 #define USART_RX_BUF_LEN 64
 #define USART_TX_BUF_LEN 64
-#define USART_BAUD_RATE  460800
+#define USART_BAUD_RATE  115200
 
 
 

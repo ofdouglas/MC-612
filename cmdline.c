@@ -241,6 +241,17 @@ void cmd_line_task(void * foo)
       xputs(response);
       xSemaphoreGive(print_mutex);
     }
+
+    
+    if (DEBUG) {
+      xSemaphoreTake(print_mutex, portMAX_DELAY);
+      if (cmd_buf[0] && arg_buf[0])
+	xprintf("cmd: %s  arg: %d.%d\n", cmd_buf, arg >> 16, arg & 0xffff);
+      else if (cmd_buf[0])
+	xprintf("cmd: %s\n", cmd_buf);
+      xSemaphoreGive(print_mutex);
+    }
+    
   }
 }
 

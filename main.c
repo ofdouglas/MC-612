@@ -107,7 +107,7 @@ int main(void)
 
   // Allocate synchronization objects
   print_mutex = xSemaphoreCreateMutex();
-  usart_rx_sem = xSemaphoreCreateBinary();
+  usart_rx_sem = xSemaphoreCreateCounting(10, 0);
   cmd_queue = xQueueCreate(4, sizeof(struct motion_cmd));
   log_queue = xQueueCreate(4, sizeof(struct ctrl_log));
 
