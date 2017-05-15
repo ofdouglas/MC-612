@@ -1,7 +1,7 @@
 /*******************************************************************************
  * usart.c - RS-232 serial communication driver
  * Author: Oliver Douglas
- *
+ * Target: STM32F051R8, using libopencm3
  ******************************************************************************/
 
 #include "common.h"

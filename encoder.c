@@ -1,8 +1,7 @@
-
 /*******************************************************************************
  * encoder.c - Position and velocity sensing using a quadrature encoder
  * Author: Oliver Douglas
- *
+ * Target: STM32F051R8, using libopencm3
  ******************************************************************************/
 
 #include "common.h"
@@ -21,18 +20,21 @@
  * Encoder position functions
  ******************************************************************************/
 
+// Convert a position measurement from encoder ticks into degrees.
+// The encoder ticks input should be less than ENCODER_COUNT.
 fix16_t encoder_ticks_to_degs(int ticks)
 {
   return fix16_smul(DEGS_PER_TICK, fix16_from_int(ticks));
 }
 
-
+// Convert a position measurement from degrees into encoder ticks.
+// The degrees input should be less than 360.
 int encoder_degs_to_ticks(fix16_t degs)
 {
   return fix16_to_int(fix16_smul(degs, TICKS_PER_DEG));
 }
 
-
+// Return the encoder position, in terms of encoder ticks.
 int encoder_get_position(void)
 {
   return timer_get_counter(TIM3);
@@ -44,13 +46,19 @@ int encoder_get_position(void)
  * Encoder velocity functions
  ******************************************************************************/
 
+// Return the direction of the last encoder position counter change (1=up, 0=down)
+int encoder_get_direction(void)
+{
+  return TIM_CR1(TIM3) & BIT4;
+}
+
 // Filter coefficients
 #define LPF_A  0.2
 #define LPF_A0 F16(LPF_A)
 #define LPF_A1 F16(1-LPF_A)
 
-// First-order IIR low-pass filter for the encoder velocity.
-// This helps reduce the noise inherent in the velocity estimation
+// First-order IIR low-pass filter for the encoder velocity. This helps 
+// reduce the quantization noise which is prsent in the velocity estimation
 // algorithm at low speeds.
 static fix16_t recursive_lpf(fix16_t x)
 {
@@ -65,30 +73,33 @@ static fix16_t recursive_lpf(fix16_t x)
 // (once per iteration of the control loop)
 fix16_t encoder_get_velocity(void)
 {
-  static int old_pos;
-  int new_pos, diff_pos;
+  static int prev_pos;
+  int cur_pos, diff_pos, dir;
 
-  new_pos = timer_get_counter(TIM3);
+  // Read our current position and direction of travel from the encoder
+  cur_pos = encoder_get_position();
+  dir = encoder_get_direction();
 
-  int dir = TIM_CR1(TIM3) & BIT4;
+  // For any two position measurements, there are two valid ways of calculating
+  // the position difference: clockwise and counterclockwise. We use the travel
+  // direction to pick which one. The relation between dir and the direction of
+  // travel (CW / CCW) will be determined by which encoder phase (A or B) is
+  // connected to which channel of the encoder timer.
   if (dir) {
-    diff_pos = -MODULAR_SUBTRACT(old_pos, new_pos, ENCODER_COUNTS);
-    gpio_set(GPIOC, LED_BLUE_BIT);
+    // counterclockwise in our setup
+    diff_pos = -MODULAR_SUBTRACT(prev_pos, cur_pos, ENCODER_COUNTS);
   }
   else {
-    diff_pos = MODULAR_SUBTRACT(new_pos, old_pos, ENCODER_COUNTS);
-    gpio_clear(GPIOC, LED_BLUE_BIT);
+    // clockwise in our setup
+    diff_pos = MODULAR_SUBTRACT(cur_pos, prev_pos, ENCODER_COUNTS);
   }
 
-  // clockwise
-  //diff_pos = modular_subtract(new_pos, old_pos, ENCODER_COUNTS);
-  
-  old_pos = new_pos;
+  // Store the current position for use next time.
+  prev_pos = cur_pos;
 
-  //  xprintf("%d\n", diff_pos);
-  
-  fix16_t diff = fix16_smul(fix16_from_int(diff_pos), RPM_COEFFICIENT);
-  return recursive_lpf(diff);
+  // Convert the position difference into degrees and apply a low-pass filter
+  // before returning it, to reduce quantization noise.
+  return recursive_lpf(fix16_smul(fix16_from_int(diff_pos), RPM_COEFFICIENT));
 }
 
 

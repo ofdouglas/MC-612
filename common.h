@@ -46,6 +46,10 @@
 #define PWM_GPIO_RCC	RCC_GPIOA
 #define PWM_BIT		BIT8
 
+#define TIMING_GPIO	GPIOC
+#define CONTROL_TASK_BIT BIT10
+#define CMDLINE_TASK_BIT BIT11
+#define LOGGING_TASK_BIT BIT12
 
 /* I/O pin usage table
  *
@@ -53,10 +57,10 @@
  *   TIM2_CH2 [PA1]	 TIM3_CH1 [PA6]		 USART1_TX [PA9]
  *   TIM2_CH3 [PA2]	 TIM3_CH2 [PA7]		 USART1_RX [PA10]
  *  
- *  LEDS		PUSHBUTTON
- *   GREEN_LED [PC8]	 USER_BTN [PA0]
- *   BLUE_LED  [PC9]
- *
+ *  LEDS		PUSHBUTTON		TASK TIMING
+ *   GREEN_LED [PC8]	 USER_BTN [PA0]		 CONTROL_TASK [PC.10]
+ *   BLUE_LED  [PC9]				 CMDLINE_TASK [PC.11]
+ *						 LOGGING_TASK [PC.12]
  */
 
 
@@ -132,7 +136,7 @@ void usart_setup(void);
 /*******************************************************************************
  * Miscellaneous definitions
  ******************************************************************************/
-#define DEBUG		1
+#define DEBUG		0
 #define MAX_CMD_LEN	3
 #define MAX_ARG_LEN	20
 

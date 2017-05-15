@@ -1,7 +1,7 @@
 /*******************************************************************************
  * main.c - Motor controller setup
  * Author: Oliver Douglas
- *
+ * Target: STM32F051R8, using libopencm3
  ******************************************************************************/
 
 #include "common.h"
@@ -64,6 +64,10 @@ void io_pin_setup(void)
   gpio_mode_setup(LED_GPIO, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE,
 		  LED_GREEN_BIT | LED_BLUE_BIT);
 
+  // Configure PC.10, PC.11, PC.12 as GPIO outputs for task timing
+  gpio_mode_setup(TIMING_GPIO, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE,
+		  CONTROL_TASK_BIT | CMDLINE_TASK_BIT | LOGGING_TASK_BIT);
+  
   // Configure PA.0 as GPIO input for the pushbutton
   gpio_mode_setup(GPIOA, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO0);
   
@@ -111,11 +115,11 @@ int main(void)
   cmd_queue = xQueueCreate(4, sizeof(struct motion_cmd));
   log_queue = xQueueCreate(4, sizeof(struct ctrl_log));
 
-  // Allocate tasks
-  xTaskCreate(toggle_task, "", 64, NULL, 1, NULL);
-  xTaskCreate(motor_control_task, "", 128, log_queue, 3, NULL);
+  // Allocate tasks (highest priority first)
+  xTaskCreate(motor_control_task, "", 128, log_queue, 4, NULL);
+  xTaskCreate(logging_task, "", 64, log_queue, 3, NULL);
   xTaskCreate(cmd_line_task, "", 128, NULL, 2, NULL);
-  xTaskCreate(logging_task, "", 64, log_queue, 2, NULL);
+  xTaskCreate(toggle_task, "", 64, NULL, 1, NULL);
 
   // Start the RTOS
   vTaskStartScheduler();

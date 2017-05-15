@@ -1,7 +1,7 @@
 /*******************************************************************************
  * controller.c - Closed loop position and velocity control
  * Author: Oliver Douglas
- *
+ * Target: STM32F051R8, using libopencm3
  ******************************************************************************/
 
 #include "common.h"
@@ -16,9 +16,9 @@ extern QueueHandle_t log_queue;
 #define V_PID_KD		(F16(1.0 / CONTROL_RATE))
 
 // Position PID controller loop gains
-#define P_PID_KP		(F16(15.0))
-#define P_PID_KI		(F16(10.0 / CONTROL_RATE))
-#define P_PID_KD		(F16(25.0 / CONTROL_RATE))
+#define P_PID_KP		(F16(5.0))
+#define P_PID_KI		(F16(5.0 / CONTROL_RATE))
+#define P_PID_KD		(F16(400.0 / CONTROL_RATE))
 
 
 
@@ -26,6 +26,9 @@ extern QueueHandle_t log_queue;
  * PID Controllers
  ******************************************************************************/
 
+// Calculate the controller output needed to make real_velocity converge to
+// goal_velocity. This function will be called periodically by motor_control_task
+// when in velocity control mode.
 static fix16_t velocity_controller(fix16_t goal_velocity, fix16_t real_velocity)
 {
   static fix16_t error_prev, integral;
@@ -41,7 +44,9 @@ static fix16_t velocity_controller(fix16_t goal_velocity, fix16_t real_velocity)
   return fix16_add(fix16_add(proportional, integral), derivative);
 }
 
-
+// Calculate the controller output needed to make real_position converge to
+// goal_position. This function will be called periodically by motor_control_task
+// when in position control mode.
 static fix16_t position_controller(int goal_position, int real_position)
 {
   static fix16_t error_prev, integral;
@@ -72,21 +77,26 @@ static fix16_t position_controller(int goal_position, int real_position)
  * Top-level controller
  ******************************************************************************/
 
-// control the motor
-// positive goal_speed: clockwise motion, TIM_OC2 is on
+// Receive a motion command and corresponding target position or target velocity
+// from the cmdline_task. Calculate the control value required to achieve this
+// target, and send it to the PWM module. Make the position, velocity, and control 
+// value available to the logging task.
 void motor_control_task(void * foo)
 {
   (void) foo;
 
   struct motion_cmd mc = { CMD_BRAKE, 0 };
   struct ctrl_log log;
-  fix16_t ctrl_output;
+  fix16_t ctrl_output = 0;
   fix16_t velocity;
   int position;
 
   while(1) {
     vTaskDelay((const TickType_t)(configTICK_RATE_HZ / CONTROL_RATE));
 
+    // Begin task timing
+    gpio_set(TIMING_GPIO, CONTROL_TASK_BIT);
+    
     if (uxQueueMessagesWaiting(cmd_queue))
       xQueueReceive(cmd_queue, &mc, 0);
 
@@ -127,5 +137,8 @@ void motor_control_task(void * foo)
     // Emergency stop button
     if (gpio_get(GPIOA, GPIO0))
       mc.cmd = CMD_BRAKE;
+
+    // End task timing
+    gpio_clear(TIMING_GPIO, CONTROL_TASK_BIT);
   }
 }

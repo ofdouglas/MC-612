@@ -1,7 +1,7 @@
 /*******************************************************************************
  * cmdline.c - Command line interface and logging
  * Author: Oliver Douglas
- *
+ * Target: STM32F051R8, using libopencm3
  ******************************************************************************/
 
 #include "common.h"
@@ -217,7 +217,10 @@ void cmd_line_task(void * foo)
     // Block indefinitely until a full line is received
     xSemaphoreTake(usart_rx_sem, portMAX_DELAY);
 
-    fix16_t arg;
+    // Begin task timing
+    gpio_set(TIMING_GPIO, CMDLINE_TASK_BIT);
+    
+    fix16_t arg = 0;
     int rv = read_line(cmd_buf, arg_buf);
     char * response = NULL;
     
@@ -242,7 +245,7 @@ void cmd_line_task(void * foo)
       xSemaphoreGive(print_mutex);
     }
 
-    
+
     if (DEBUG) {
       xSemaphoreTake(print_mutex, portMAX_DELAY);
       if (cmd_buf[0] && arg_buf[0])
@@ -251,7 +254,10 @@ void cmd_line_task(void * foo)
 	xprintf("cmd: %s\n", cmd_buf);
       xSemaphoreGive(print_mutex);
     }
+
     
+    // End task timing
+    gpio_clear(TIMING_GPIO, CMDLINE_TASK_BIT);
   }
 }
 
@@ -269,14 +275,21 @@ void logging_task(void * foo)
 
   while (1) {
     xQueueReceive(log_queue, &log, portMAX_DELAY);
+
+    // Begin task timing
+    gpio_set(TIMING_GPIO, LOGGING_TASK_BIT);
+    
     if (do_logging) {
       xSemaphoreTake(print_mutex, portMAX_DELAY);
-      xprintf("%d.%d %d.%d %d.%d\n",
+      xprintf("%#d.%d %d.%d %d.%d\n",
 	      log.position >> 16, log.position & 0xffff,
 	      log.velocity >> 16, log.velocity & 0xffff,
 	      log.ctrl_output >> 16, log.ctrl_output & 0xffff);
       xSemaphoreGive(print_mutex);
     }
+
+    // End task timing
+    gpio_clear(TIMING_GPIO, LOGGING_TASK_BIT);
   }
 }
 
