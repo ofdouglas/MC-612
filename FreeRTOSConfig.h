@@ -95,7 +95,7 @@
 #define configCPU_CLOCK_HZ		( 8000000 )
 #define configTICK_RATE_HZ		( ( TickType_t ) 1000 )
 #define configMAX_PRIORITIES		( 5 )
-#define configMINIMAL_STACK_SIZE	( ( unsigned short ) 128 )
+#define configMINIMAL_STACK_SIZE	( ( unsigned short ) 64 )
 #define configTOTAL_HEAP_SIZE		( ( size_t ) ( 4000 ) )
 #define configMAX_TASK_NAME_LEN		( 5 )
 #define configUSE_TRACE_FACILITY	1
@@ -109,6 +109,8 @@
 #define configUSE_APPLICATION_TASK_TAG	0
 #define configUSE_COUNTING_SEMAPHORES	1
 #define configGENERATE_RUN_TIME_STATS	0
+#define configSUPPORT_STATIC_ALLOCATION 0
+#define configSUPPORT_DYNAMIC_ALLOCATION 1
 
 /* Co-routine definitions. */
 #define configUSE_CO_ROUTINES 		0
@@ -130,11 +132,12 @@
 #define INCLUDE_vTaskDelayUntil		1
 #define INCLUDE_vTaskDelay		1
 
-void assertion_failed(void);
+
+void assertion_failed(const char *file, int line);
 
 /* Normal assert() semantics without relying on the provision of an assert.h
    header file. */
-#define configASSERT(x) if((x) == 0) { assertion_failed(); }
+#define configASSERT(x) if((x) == 0) { assertion_failed(__FILE__, __LINE__); }
 
 #endif /* FREERTOS_CONFIG_H */
 

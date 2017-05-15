@@ -7,11 +7,12 @@
 #include "common.h"
 
 extern SemaphoreHandle_t usart_rx_sem;
-
+extern SemaphoreHandle_t print_mutex;
 extern QueueHandle_t cmd_queue;
+extern QueueHandle_t log_queue;
 
-extern int usart_getchar(void);
-extern void usart_putchar(unsigned char c);
+// Logging enable flag that is set by cmd_line_task and read by logging_task. 
+static volatile int do_logging;
 
 
 
@@ -108,8 +109,6 @@ int cmd_break(fix16_t arg)
   return xQueueSend(cmd_queue, &mc, portMAX_DELAY);
 }
 
-static int do_logging;
-
 // Enable or disable logging output to the serial terminal
 int cmd_toggle_log(fix16_t arg)
 {
@@ -199,58 +198,73 @@ void cmd_line_task(void * foo)
 {
   (void) foo;
 
-  xdev_out(usart_putchar);
-  xputs("MC-612 Motor Controller Online\n");
-  xputs("==============================\n");
-  
   char cmd_buf[MAX_CMD_LEN + 1];
   char arg_buf[MAX_ARG_LEN + 1];
 
+  // Check memory usage. We are not using dynamic memory allocation for
+  // anything once the scheduler has started, but since the scheduler allocates
+  // some memory for itself, we have to check usage inside a task.
+  //
+  // The only reason that a 'heap' and non-static versions of xTaskCreate, etc,
+  // were used, is that they are simpler to get working than the truly static
+  // allocation versions.
+  //
+  // Because no more memory is allocated, the free heap amount can be small.
+  if (DEBUG)
+    xprintf("free heap: %d\n", xPortGetFreeHeapSize());
+  
   while (1) {
     // Block indefinitely until a full line is received
     xSemaphoreTake(usart_rx_sem, portMAX_DELAY);
-    
-    int rv = read_line(cmd_buf, arg_buf);
+
     fix16_t arg;
+    int rv = read_line(cmd_buf, arg_buf);
+    char * response = NULL;
     
-    if (rv)
-      xputs("parse error\n");
+    if (rv) {
+      response = "parse error\n";
+    }
     else {
       int cmd_index = cmd_index_lookup(cmd_buf);
-      if (cmd_index == -1)
-	xputs("invalid command\n");
+      if (cmd_index == -1) {
+	response = "invalid command\n";
+      }
       else {
+	response = "ack\n";
 	arg = atofix16(arg_buf);
 	(cmd_table[cmd_index].cmd_func)(arg);
       }
-      if (DEBUG) {
-	if (cmd_buf[0] && arg_buf[0])
-	  xprintf("cmd: %s  arg: %d.%d\n", cmd_buf, arg >> 16, arg & 0xffff);
-	else if (cmd_buf[0])
-	  xprintf("cmd: %s\n", cmd_buf);
-      }
+    }
+
+    if (response) {
+      xSemaphoreTake(print_mutex, portMAX_DELAY);
+      xputs(response);
+      xSemaphoreGive(print_mutex);
     }
   }
 }
+
 
 
 /*******************************************************************************
  * Logging of sensor data and controller output 
  ******************************************************************************/
 
-void logging_task(void * log_queue_void)
+void logging_task(void * foo)
 {
+  (void) foo;
   
-  QueueHandle_t log_queue = (QueueHandle_t) log_queue_void;
   struct ctrl_log log;
 
   while (1) {
     xQueueReceive(log_queue, &log, portMAX_DELAY);
     if (do_logging) {
+      xSemaphoreTake(print_mutex, portMAX_DELAY);
       xprintf("%d.%d %d.%d %d.%d\n",
 	      log.position >> 16, log.position & 0xffff,
 	      log.velocity >> 16, log.velocity & 0xffff,
 	      log.ctrl_output >> 16, log.ctrl_output & 0xffff);
+      xSemaphoreGive(print_mutex);
     }
   }
 }

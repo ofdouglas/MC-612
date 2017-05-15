@@ -132,7 +132,7 @@ void usart_setup(void);
 /*******************************************************************************
  * Miscellaneous definitions
  ******************************************************************************/
-#define DEBUG		0
+#define DEBUG		1
 #define MAX_CMD_LEN	3
 #define MAX_ARG_LEN	20
 

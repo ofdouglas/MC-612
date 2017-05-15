@@ -7,26 +7,22 @@
 #include "common.h"
 
 
-extern void motor_control_task(void * foo);
-extern void cmd_line_task(void * foo);
-extern void logging_task(void * foo);
 
-extern void pwm_timer_config(void);
-extern void encoder_timer_config(void);
-extern void usart_config(void);
+/*******************************************************************************
+ * Debugging
+ ******************************************************************************/
 
-QueueHandle_t log_queue;
-
-void assertion_failed(void)
+void assertion_failed(const char *file, int line)
 {
-  xputs("assertion failed\n");
+  xprintf("assertion failed: %s:%d\n", file, line);
   taskDISABLE_INTERRUPTS();
   while (1)
     ; // do nothing
 }
 
-
 // Toggle green LED to show that the system is still running
+// NOTE: creating a task solely for this purpose wastes considerable memory.
+// In the future, replace this with FreeRTOS' vApplicationIdleHook() mechanism.
 void toggle_task(void *foo)
 {
   (void)foo;
@@ -37,6 +33,11 @@ void toggle_task(void *foo)
   }
 }
 
+
+
+/*******************************************************************************
+ * Basic hardware setup
+ ******************************************************************************/
 
 void clock_setup(void)
 {
@@ -72,31 +73,51 @@ void io_pin_setup(void)
 }
 
 
+
+/*******************************************************************************
+ * Application entry point
+ ******************************************************************************/
+
+// Synchronization objects to be created
+SemaphoreHandle_t print_mutex;
+SemaphoreHandle_t usart_rx_sem;
+QueueHandle_t cmd_queue;
+QueueHandle_t log_queue;
+
+// Tasks to be created
+extern void motor_control_task(void * foo);
+extern void cmd_line_task(void * foo);
+extern void logging_task(void * foo);
+
 int main(void)
 {
   // Allow the debugger to work during sleep modes
   DBGMCU_CR = DBGMCU_CR_STOP | DBGMCU_CR_STANDBY;
-  
+
+  // Setup peripherals
   clock_setup();
-  io_pin_setup();
   usart_setup();
+  io_pin_setup();
   pwm_setup();
   encoder_setup();
+  
+  xdev_out(usart_putchar);
+  xputs("\nMC-612 Motor Controller Online\n");
+  xputs("==============================\n\n");
 
-  log_queue = xQueueCreate(10, sizeof(struct ctrl_log));
-  
-  xTaskCreate(toggle_task, "", configMINIMAL_STACK_SIZE,
-	      NULL, 1, NULL);
-  
-  xTaskCreate(motor_control_task, "", configMINIMAL_STACK_SIZE,
-    	      log_queue, 3, NULL);
+  // Allocate synchronization objects
+  print_mutex = xSemaphoreCreateMutex();
+  usart_rx_sem = xSemaphoreCreateBinary();
+  cmd_queue = xQueueCreate(4, sizeof(struct motion_cmd));
+  log_queue = xQueueCreate(4, sizeof(struct ctrl_log));
 
-  xTaskCreate(cmd_line_task, "", configMINIMAL_STACK_SIZE,
-	      NULL, 2, NULL);
-  
-  xTaskCreate(logging_task, "", configMINIMAL_STACK_SIZE,
-	      log_queue, 2, NULL);
-  
+  // Allocate tasks
+  xTaskCreate(toggle_task, "", 64, NULL, 1, NULL);
+  xTaskCreate(motor_control_task, "", 128, log_queue, 3, NULL);
+  xTaskCreate(cmd_line_task, "", 128, NULL, 2, NULL);
+  xTaskCreate(logging_task, "", 64, log_queue, 2, NULL);
+
+  // Start the RTOS
   vTaskStartScheduler();
   
   while (1)

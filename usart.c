@@ -8,7 +8,7 @@
 
 
 // Incremented when a line is received, decremented when the line is processed
-SemaphoreHandle_t usart_rx_sem;
+extern SemaphoreHandle_t usart_rx_sem;
 
 
 /*******************************************************************************
@@ -97,8 +97,6 @@ void usart_setup(void)
   usart_set_flow_control(USART1, USART_FLOWCONTROL_NONE);
   usart_set_mode(USART1, USART_MODE_TX_RX);
   usart_enable(USART1);
-
-  usart_rx_sem = xSemaphoreCreateBinary();
 
   usart_enable_rx_interrupt(USART1);
   nvic_enable_irq(NVIC_USART1_IRQ);

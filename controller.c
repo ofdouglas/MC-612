@@ -6,7 +6,8 @@
 
 #include "common.h"
 
-QueueHandle_t cmd_queue;
+extern QueueHandle_t cmd_queue;
+extern QueueHandle_t log_queue;
 
 
 // Velocity PID controller loop gains
@@ -73,22 +74,16 @@ static fix16_t position_controller(int goal_position, int real_position)
 
 // control the motor
 // positive goal_speed: clockwise motion, TIM_OC2 is on
-void motor_control_task(void * log_queue_void)
+void motor_control_task(void * foo)
 {
-  cmd_queue = xQueueCreate(5, sizeof(struct motion_cmd));
+  (void) foo;
 
-  QueueHandle_t log_queue = (QueueHandle_t) log_queue_void;
+  struct motion_cmd mc = { CMD_BRAKE, 0 };
   struct ctrl_log log;
-  
   fix16_t ctrl_output;
   fix16_t velocity;
   int position;
 
-  struct motion_cmd mc = {
-    .cmd = CMD_BRAKE,
-    .arg = 0
-  };
-  
   while(1) {
     vTaskDelay((const TickType_t)(configTICK_RATE_HZ / CONTROL_RATE));
 
@@ -116,6 +111,9 @@ void motor_control_task(void * log_queue_void)
 	ctrl_output = position_controller(encoder_degs_to_ticks(mc.arg), position);
 	pwm_set_output(ctrl_output);
 	break;
+
+      default:
+	configASSERT(0);	// Fatal error: non-existent command
       }
 
     // Send the current position, velocity, and controller output to
