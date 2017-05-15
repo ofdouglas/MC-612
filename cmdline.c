@@ -194,7 +194,7 @@ int read_line(char *cmd_buf, char *arg_buf)
 }
 
 
-void cmd_line_task(void * foo)
+void cmdline_task(void * foo)
 {
   (void) foo;
 

@@ -88,9 +88,9 @@ SemaphoreHandle_t usart_rx_sem;
 QueueHandle_t cmd_queue;
 QueueHandle_t log_queue;
 
-// Tasks to be created
-extern void motor_control_task(void * foo);
-extern void cmd_line_task(void * foo);
+// Tasks from other modules, to be created
+extern void motorctrl_task(void * foo);
+extern void cmdline_task(void * foo);
 extern void logging_task(void * foo);
 
 int main(void)
@@ -116,9 +116,9 @@ int main(void)
   log_queue = xQueueCreate(4, sizeof(struct ctrl_log));
 
   // Allocate tasks (highest priority first)
-  xTaskCreate(motor_control_task, "", 128, log_queue, 4, NULL);
+  xTaskCreate(motorctrl_task, "", 128, log_queue, 4, NULL);
   xTaskCreate(logging_task, "", 64, log_queue, 3, NULL);
-  xTaskCreate(cmd_line_task, "", 128, NULL, 2, NULL);
+  xTaskCreate(cmdline_task, "", 128, NULL, 2, NULL);
   xTaskCreate(toggle_task, "", 64, NULL, 1, NULL);
 
   // Start the RTOS

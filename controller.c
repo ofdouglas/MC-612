@@ -81,7 +81,7 @@ static fix16_t position_controller(int goal_position, int real_position)
 // from the cmdline_task. Calculate the control value required to achieve this
 // target, and send it to the PWM module. Make the position, velocity, and control 
 // value available to the logging task.
-void motor_control_task(void * foo)
+void motorctrl_task(void * foo)
 {
   (void) foo;
 
