@@ -76,7 +76,7 @@
 #define RPM_MAX		200
 
 // Motion commands passed from the command line interface to the controller
-enum { CMD_BRAKE, CMD_VELOCITY, CMD_POSITION };
+enum { CMD_BRAKE, CMD_VELOCITY, CMD_POSITION, CMD_OPENLOOP };
        
 struct motion_cmd {
   int cmd;

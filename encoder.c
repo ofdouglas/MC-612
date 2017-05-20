@@ -47,7 +47,7 @@ int encoder_get_position(void)
  ******************************************************************************/
 
 // Return the direction of the last encoder position counter change (1=up, 0=down)
-int encoder_get_direction(void)
+static int encoder_get_direction(void)
 {
   return TIM_CR1(TIM3) & BIT4;
 }

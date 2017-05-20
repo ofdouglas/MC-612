@@ -72,7 +72,7 @@ fix16_t atofix16(char * s)
  ******************************************************************************/
 
 // Set the motor velocity, in RPM (begin closed-loop velocity control)
-int cmd_set_rpm(fix16_t arg)
+static int cmd_set_rpm(fix16_t arg)
 {
   struct motion_cmd mc = {
     .cmd = CMD_VELOCITY,
@@ -83,10 +83,20 @@ int cmd_set_rpm(fix16_t arg)
 }
 
 // Set the motor position, in degrees (begin closed-loop position control)
-int cmd_set_pos(fix16_t arg)
+static int cmd_set_pos(fix16_t arg)
 {
   struct motion_cmd mc = {
     .cmd = CMD_POSITION,
+    .arg = arg
+  };
+  
+  return xQueueSend(cmd_queue, &mc, portMAX_DELAY);
+}
+
+static int cmd_openloop(fix16_t arg)
+{
+  struct motion_cmd mc = {
+    .cmd = CMD_OPENLOOP,
     .arg = arg
   };
   
@@ -97,7 +107,7 @@ int cmd_set_pos(fix16_t arg)
 // the motor faster than 'rpm=0' due to the lag in the PID controller, but
 // after the transient, the results will be very similar. The motor will
 // remain shorted until a new command is issued.
-int cmd_break(fix16_t arg)
+static int cmd_break(fix16_t arg)
 {
   (void) arg;
   
@@ -110,7 +120,7 @@ int cmd_break(fix16_t arg)
 }
 
 // Enable or disable logging output to the serial terminal
-int cmd_toggle_log(fix16_t arg)
+static int cmd_toggle_log(fix16_t arg)
 {
   (void) arg;
   
@@ -123,18 +133,19 @@ struct command {
   int (* cmd_func)(fix16_t);
 };
 
-struct command cmd_table[] = {
+static struct command cmd_table[] = {
   { .name = "rpm", cmd_set_rpm },
   { .name = "pos", cmd_set_pos },
+  { .name = "olt", cmd_openloop },
   { .name = "brk", cmd_break },
   { .name = "tlg", cmd_toggle_log }
 };
 
 // Return the index of 'str' in the command table, or -1 if it isn't found.
-int cmd_index_lookup(const char *str)
+static int cmd_index_lookup(const char *cmd_str)
 {
   for (size_t i = 0; i < sizeof(cmd_table) / sizeof(cmd_table[0]); i++)
-    if (strncmp(cmd_table[i].name, str, MAX_CMD_LEN) == 0)
+    if (strncmp(cmd_table[i].name, cmd_str, MAX_CMD_LEN) == 0)
       return i;
   
   return -1;
@@ -148,7 +159,7 @@ int cmd_index_lookup(const char *str)
 
 // Attempt to fill cmd_buf and arg_buf from the USART receive buffer
 // return -1 on syntax error
-int read_line(char *cmd_buf, char *arg_buf)
+static int read_line(char *cmd_buf, char *arg_buf)
 {
   int i, c;
 
@@ -281,7 +292,7 @@ void logging_task(void * foo)
     
     if (do_logging) {
       xSemaphoreTake(print_mutex, portMAX_DELAY);
-      xprintf("%#d.%d %d.%d %d.%d\n",
+      xprintf("#%d.%d %d.%d %d.%d\n",
 	      log.position >> 16, log.position & 0xffff,
 	      log.velocity >> 16, log.velocity & 0xffff,
 	      log.ctrl_output >> 16, log.ctrl_output & 0xffff);

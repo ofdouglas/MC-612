@@ -122,6 +122,11 @@ void motorctrl_task(void * foo)
 	pwm_set_output(ctrl_output);
 	break;
 
+      case CMD_OPENLOOP:
+	ctrl_output = mc.arg;
+	pwm_set_output(ctrl_output);
+	break;
+	
       default:
 	configASSERT(0);	// Fatal error: non-existent command
       }
